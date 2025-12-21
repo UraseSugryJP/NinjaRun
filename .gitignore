@@ -1,0 +1,48 @@
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Mm]emoryCaptures/
+
+# 各PCの固有設定 (Mac/Win混在時に重要)
+/[UserSettings]/
+/[ProjectSettings]/ProjectVersion.txt
+# ※ProjectVersion.txtを外すかはチーム方針によりますが、
+# Unityのバージョンを固定しているなら含めてもOKです。
+
+# Visual Studio / Rider / VS Code が自動生成するファイル
+*.csproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svclog
+*.pdb
+*.opendb
+*.VC.db
+
+# Unityが生成する一時ファイル
+/Assets/AssetStoreAssetPackages/
+/Assets/Plugins/Editor/JetBrains*
+/Assets/Scripts/bin/
+/Assets/Scripts/obj/
+
+# OS固有のゴミファイル (OS混在環境では必須)
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+desktop.ini
+
+# Crashlyticsなどのビルドログ
+crashlytics-build.properties
+
+# --- Git LFS で管理すべき巨大なバイナリファイルの「バックアップ」等 ---
+# (LFS本体は管理しますが、エディタが作る一時的なコピーは除外)
+*.swp
+*~
