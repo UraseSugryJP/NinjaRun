@@ -219,7 +219,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 2100000, guid: 0086435074c4a4b7ca26cd2df33b7a72, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -255,9 +255,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 311354abe4ce7410cbacac67355cfb82, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
-  sideSpeed: 10
-  limitX: 4.5
-  jumpForce: 8
+  laneWidth: 2
+  laneChangeSpeed: 10
+  jumpForce: 10
   gravity: 10
   groundLayer:
     serializedVersion: 2
