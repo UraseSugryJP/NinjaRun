@@ -50,7 +50,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 590f3688402ec4cb6b95202bf59575f9, type: 3}
       propertyPath: m_Name
-      value: ninjaModel1
+      value: PlayerNinja
       objectReference: {fileID: 0}
     - target: {fileID: 4841573710733245645, guid: 590f3688402ec4cb6b95202bf59575f9, type: 3}
       propertyPath: m_Name
@@ -112,6 +112,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 590f3688402ec4cb6b95202bf59575f9, type: 3}
       insertIndex: -1
       addedObject: {fileID: 9193469954821329167}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 590f3688402ec4cb6b95202bf59575f9, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2178801193616066760}
   m_SourcePrefab: {fileID: 100100000, guid: 590f3688402ec4cb6b95202bf59575f9, type: 3}
 --- !u!1 &3701815898068573448 stripped
 GameObject:
@@ -180,10 +183,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 311354abe4ce7410cbacac67355cfb82, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
-  laneWidth: 4
-  laneChangeSpeed: 10
-  jumpForce: 15
-  gravity: 25
+  laneWidth: 2
+  laneChangeSpeed: 5
+  jumpForce: 10
+  gravity: 20
   groundLayer:
     serializedVersion: 2
     m_Bits: 64
@@ -201,3 +204,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerCollision
   movement: {fileID: 0}
+--- !u!114 &2178801193616066760
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3701815898068573448}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa20ba4b142ee4dfd91b99274789903b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerAnimation
