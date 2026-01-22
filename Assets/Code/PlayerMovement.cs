@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem; // ★これが新しい入力システムの証
+using System.Collections; // ★音の長さを制御するために必要
 
 [RequireComponent(typeof(CapsuleCollider))]
 public class PlayerMovement : MonoBehaviour
@@ -15,6 +16,14 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float jumpForce = 8f;
     [SerializeField] private float gravity = 30f;
 
+    [Header("ジャンプ音設定")]
+    [SerializeField] private AudioSource jumpSound; // 音源コンポーネント用
+    [SerializeField] private AudioClip jumpClip;   // 再生するSE用
+
+    [Header("ローリング音設定")]
+    [SerializeField] private AudioSource rollSound; // 音源コンポーネント用
+    [SerializeField] private AudioClip rollClip;   // 再生するSE用
+    
     [Header("接地判定設定")]
     [SerializeField] private LayerMask groundLayer;
     [SerializeField] private float rayLength = 10f;
@@ -40,6 +49,15 @@ public class PlayerMovement : MonoBehaviour
             defaultHeight = col.height;
             defaultCenterY = col.center.y;
         }
+
+        // ★ 自動でAudioSourceを取得する設定（これを追加）
+        if (jumpSound == null)
+        {
+            jumpSound = GetComponent<AudioSource>();
+        }
+
+        // ★ rollSoundも自動で自分から探すように追加
+        if (rollSound == null) rollSound = GetComponent<AudioSource>();
     }
 
     void Update()
@@ -180,6 +198,9 @@ public class PlayerMovement : MonoBehaviour
             {
                 verticalVelocity = jumpForce;
                 IsGrounded = false;
+
+                // ★ ここで関数を呼び出すように追加
+                JumpSound();
             }
         }
         else
@@ -199,15 +220,46 @@ public class PlayerMovement : MonoBehaviour
         // ローリング判定に関数を使用
         if (CheckRollInput() && IsGrounded)
         {
-            IsRolling = true;
-            col.height = rollHeight;
-            col.center = new Vector3(col.center.x, rollCenterY, col.center.z);
+            if (!IsRolling) // ★ここがポイント：開始した瞬間だけ通る
+            {
+                IsRolling = true;
+                col.height = rollHeight;
+                col.center = new Vector3(col.center.x, rollCenterY, col.center.z);
+
+                StartCoroutine(RollSound(3.5f)); // ★ここなら1回だけ鳴ります
+            }
         }
         else
         {
             IsRolling = false;
             col.height = defaultHeight;
             col.center = new Vector3(col.center.x, defaultCenterY, col.center.z);
+        }
+    }
+
+
+    private void JumpSound()
+    {
+        // AudioSourceでジャンプ音を再生
+        if (jumpSound != null && jumpClip != null)
+        {
+            jumpSound.PlayOneShot(jumpClip);
+        }
+    }
+
+    private IEnumerator RollSound(float duration)
+    {
+        // AudioSourceでローリング音を再生
+        if (rollSound != null && rollClip != null)
+        {
+            rollSound.clip = rollClip;
+            rollSound.Play();
+
+            // 指定した時間（0.5秒）待つ
+            yield return new WaitForSeconds(duration);
+
+            // ローリング中であっても音を止める
+            rollSound.Stop();
         }
     }
 }
