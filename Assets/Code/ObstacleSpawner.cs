@@ -14,25 +14,25 @@ public class ObstacleSpawner : MonoBehaviour
     [SerializeField] private GameObject jumpObstaclePrefab;   // 2: 低い障害物（ジャンプで越える）
     [SerializeField] private GameObject rollObstaclePrefab;   // 3: 高い障害物（ローリングでくぐる）
 
-    [Header("生成距離設定（メートル単位）")]
-    [SerializeField] private float spawnSpacing = 15.0f;      // 1行あたりのZ間隔
-    [SerializeField] private float patternGap = 10.0f;        // パターン間の間隔
-    [SerializeField] private float initialSpawnOffset = 20.0f;
-    [SerializeField] private float spawnAheadRange = 50.0f;
+    // 生成距離設定（メートル単位）- コードで管理
+    private float spawnSpacing = 2.0f;       // 1行あたりのZ間隔
+    private float patternGap = 2.0f;         // パターン間の間隔
+    private float initialSpawnOffset = 10.0f;
+    private float spawnAheadRange = 50.0f;
 
-    [Header("レーン/位置")]
-    [SerializeField] private float laneWidth = 3.0f;
+    // レーン/位置 - コードで管理
+    private float laneWidth = 1.0f;
 
-    [Header("地面検出")]
-    [SerializeField] private LayerMask groundLayer = ~0;
-    [SerializeField] private float groundRayHeight = 10f;
-    [SerializeField] private float groundRayMaxDistance = 30f;
+    // 地面検出 - コードで管理
+    private LayerMask groundLayer = ~0;
+    private float groundRayHeight = 10f;
+    private float groundRayMaxDistance = 30f;
 
-    [Header("制限")]
-    [SerializeField] private int maxTotalObstacles = 300;
+    // 制限 - コードで管理
+    private int maxTotalObstacles = 300;
 
-    [Header("重なり防止")]
-    [SerializeField] private float minObstacleDistance = 2.0f;
+    // 重なり防止 - コードで管理
+    private float minObstacleDistance = 0.5f;  // laneWidth(1.0)より小さくする必要あり
 
     // ============================================================
     // パターン定義
@@ -43,69 +43,118 @@ public class ObstacleSpawner : MonoBehaviour
     // ============================================================
     private static readonly int[][,] patterns = new int[][,]
     {
-        // パターン1：ジャンプの基本
+        // パターン1：ジグザグ強制移動
         new int[,] {
-            { 0, 0, 0 },
-            { 0, 2, 0 },
-            { 0, 0, 0 },
-            { 0, 2, 0 },
-            { 0, 0, 0 }
+            { 0, 1, 1 },
+            { 1, 1, 0 },
+            { 1, 0, 1 },
+            { 0, 1, 1 },
+            { 1, 1, 0 },
+            { 1, 0, 1 }
         },
-        // パターン2：ローリングゲート
+        // パターン2：回転移動＋ジャンプ
         new int[,] {
-            { 0, 0, 0 },
-            { 1, 3, 1 },
-            { 1, 3, 1 },
-            { 0, 0, 0 },
-            { 0, 0, 0 }
+            { 2, 1, 1 },
+            { 1, 2, 1 },
+            { 1, 1, 2 },
+            { 1, 2, 1 },
+            { 2, 1, 1 },
+            { 1, 1, 0 }
         },
-        // パターン3：ワイドバー（強制アクション）
+        // パターン3：全レーンアクション交互
         new int[,] {
-            { 0, 0, 0 },
+            { 3, 3, 3 },
             { 2, 2, 2 },
-            { 0, 0, 0 },
-            { 0, 0, 0 },
+            { 0, 1, 1 },
+            { 3, 3, 3 },
+            { 1, 1, 0 },
+            { 2, 2, 2 }
+        },
+        // パターン4：渦巻き移動
+        new int[,] {
+            { 0, 1, 1 },
+            { 2, 0, 1 },
+            { 1, 3, 0 },
+            { 1, 0, 2 },
+            { 1, 1, 0 },
+            { 0, 1, 1 }
+        },
+        // パターン5：中央封鎖→開放→封鎖
+        new int[,] {
+            { 0, 1, 0 },
+            { 2, 1, 2 },
+            { 1, 0, 1 },
+            { 3, 0, 3 },
+            { 1, 0, 1 },
+            { 0, 1, 0 },
+            { 2, 1, 2 }
+        },
+        // パターン6：斜め壁連続
+        new int[,] {
+            { 1, 1, 0 },
+            { 1, 0, 2 },
+            { 0, 1, 1 },
+            { 3, 1, 1 },
+            { 1, 0, 1 },
+            { 1, 1, 0 },
+            { 0, 2, 1 }
+        },
+        // パターン7：全方位アクション
+        new int[,] {
+            { 2, 1, 3 },
+            { 1, 0, 1 },
+            { 3, 1, 2 },
+            { 1, 0, 1 },
+            { 2, 1, 3 },
+            { 0, 2, 0 }
+        },
+        // パターン8：高速レーン切替
+        new int[,] {
+            { 0, 1, 1 },
+            { 1, 0, 1 },
+            { 1, 1, 0 },
+            { 0, 1, 1 },
+            { 1, 0, 1 },
+            { 1, 1, 0 }
+        },
+        // パターン9：中央トラップ
+        new int[,] {
+            { 1, 0, 1 },
+            { 0, 2, 0 },
+            { 1, 0, 1 },
+            { 0, 3, 0 },
+            { 1, 0, 1 },
+            { 0, 1, 0 },
+            { 1, 0, 1 }
+        },
+        // パターン10：カオス高難度
+        new int[,] {
+            { 2, 1, 0 },
+            { 1, 3, 1 },
+            { 0, 1, 2 },
+            { 1, 2, 1 },
+            { 3, 1, 0 },
+            { 1, 0, 1 },
+            { 0, 1, 3 }
+        },
+        // パターン11：ダブルアクション連続
+        new int[,] {
+            { 2, 2, 2 },
+            { 1, 0, 1 },
+            { 3, 3, 3 },
+            { 0, 1, 1 },
+            { 2, 2, 2 },
+            { 1, 1, 0 },
             { 3, 3, 3 }
         },
-        // パターン4：ハイ＆ロー（交互）
+        // パターン12：極限回避
         new int[,] {
-            { 0, 2, 0 },
-            { 0, 0, 0 },
-            { 0, 3, 0 },
-            { 0, 0, 0 },
-            { 0, 1, 0 }
-        },
-        // パターン5：選べる苦痛（分岐）
-        new int[,] {
-            { 0, 0, 0 },
-            { 2, 1, 3 },
-            { 2, 1, 3 },
-            { 0, 0, 0 },
-            { 0, 0, 0 }
-        },
-        // パターン6：アクション階段
-        new int[,] {
-            { 2, 0, 0 },
-            { 0, 0, 0 },
-            { 0, 3, 0 },
-            { 0, 0, 0 },
-            { 0, 0, 2 }
-        },
-        // パターン7：インポッシブル・ウォール（ひっかけ）
-        new int[,] {
+            { 1, 2, 1 },
+            { 0, 1, 1 },
             { 1, 3, 1 },
-            { 1, 0, 1 },
-            { 0, 0, 0 },
-            { 2, 2, 2 },
-            { 0, 0, 0 }
-        },
-        // パターン8：トリッキーロード（全部盛り）
-        new int[,] {
-            { 2, 0, 1 },
-            { 0, 0, 0 },
-            { 1, 3, 1 },
-            { 0, 0, 0 },
-            { 1, 2, 0 }
+            { 1, 1, 0 },
+            { 1, 2, 1 },
+            { 1, 0, 1 }
         },
     };
 
