@@ -293,7 +293,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 13.94, y: 11.92203, z: 17.17667}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1, y: 1, z: 0.5}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -965,7 +965,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 13.44, y: 13.34, z: 17.66}
-  m_LocalScale: {x: 1, y: 4, z: 1}
+  m_LocalScale: {x: 1, y: 3, z: 0.3}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -1004,18 +1004,6 @@ MonoBehaviour:
   wallPrefab: {fileID: 906088293}
   jumpObstaclePrefab: {fileID: 113765863}
   rollObstaclePrefab: {fileID: 1081776659}
-  spawnSpacing: 15
-  patternGap: 10
-  initialSpawnOffset: 20
-  spawnAheadRange: 50
-  laneWidth: 3
-  groundLayer:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  groundRayHeight: 10
-  groundRayMaxDistance: 30
-  maxTotalObstacles: 300
-  minObstacleDistance: 2
   debugSpawnOffsetX: 30
 --- !u!4 &943182523
 Transform:
@@ -1284,7 +1272,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 13.94, y: 11.92203, z: 19.07}
-  m_LocalScale: {x: 4, y: 1, z: 1}
+  m_LocalScale: {x: 1, y: 2, z: 0.5}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -3195,6 +3183,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Player
       objectReference: {fileID: 0}
+    - target: {fileID: 2132857833871152666, guid: ce5a55db8fdca4a4abcd471badbc174d, type: 3}
+      propertyPath: field of view
+      value: 60
+      objectReference: {fileID: 0}
     - target: {fileID: 4846041294720692229, guid: ce5a55db8fdca4a4abcd471badbc174d, type: 3}
       propertyPath: m_LocalPosition.x
       value: -1.18
@@ -3233,19 +3225,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6556536722657771887, guid: ce5a55db8fdca4a4abcd471badbc174d, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 2.5
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 6556536722657771887, guid: ce5a55db8fdca4a4abcd471badbc174d, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -5
+      value: -6
       objectReference: {fileID: 0}
     - target: {fileID: 6556536722657771887, guid: ce5a55db8fdca4a4abcd471badbc174d, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 0.9990483
+      value: 0.9961947
       objectReference: {fileID: 0}
     - target: {fileID: 6556536722657771887, guid: ce5a55db8fdca4a4abcd471badbc174d, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0.043619405
+      value: 0.08715578
       objectReference: {fileID: 0}
     - target: {fileID: 6556536722657771887, guid: ce5a55db8fdca4a4abcd471badbc174d, type: 3}
       propertyPath: m_LocalRotation.y
@@ -3253,7 +3245,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6556536722657771887, guid: ce5a55db8fdca4a4abcd471badbc174d, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
-      value: 5
+      value: 10
       objectReference: {fileID: 0}
     - target: {fileID: 6556536722657771887, guid: ce5a55db8fdca4a4abcd471badbc174d, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y

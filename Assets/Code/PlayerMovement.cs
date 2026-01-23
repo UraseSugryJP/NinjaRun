@@ -41,6 +41,10 @@ public class PlayerMovement : MonoBehaviour
     public bool IsGrounded { get; private set; }
     public bool IsRolling { get; private set; }
 
+    // ローリング時間制御
+    private float rollDuration = 1.0f;  // ローリング継続時間（秒）
+    private float rollTimer = 0f;       // ローリング残り時間
+
     void Start()
     {
         col = GetComponent<CapsuleCollider>();
@@ -142,19 +146,20 @@ public class PlayerMovement : MonoBehaviour
     }
 
     // --- ローリング入力のチェック関数 ---
+    // wasPressedThisFrame: 押した瞬間のみtrue
     private bool CheckRollInput()
     {
         // キーボード: 下矢印, S
         if (Keyboard.current != null)
         {
-            if (Keyboard.current.downArrowKey.isPressed || Keyboard.current.sKey.isPressed)
+            if (Keyboard.current.downArrowKey.wasPressedThisFrame || Keyboard.current.sKey.wasPressedThisFrame)
                 return true;
         }
 
         // ゲームパッド: 東ボタン(Bボタン/○ボタン) または 十字キー下
         if (Gamepad.current != null)
         {
-            if (Gamepad.current.buttonEast.isPressed || Gamepad.current.dpad.down.isPressed)
+            if (Gamepad.current.buttonEast.wasPressedThisFrame || Gamepad.current.dpad.down.wasPressedThisFrame)
                 return true;
         }
 
@@ -217,23 +222,29 @@ public class PlayerMovement : MonoBehaviour
     {
         if (col == null) return;
 
-        // ローリング判定に関数を使用
+        // ローリング中の場合、タイマーを減らす
+        if (IsRolling)
+        {
+            rollTimer -= Time.deltaTime;
+            if (rollTimer <= 0f)
+            {
+                // ローリング終了
+                IsRolling = false;
+                col.height = defaultHeight;
+                col.center = new Vector3(col.center.x, defaultCenterY, col.center.z);
+            }
+            return; // ローリング中は新たな入力を受け付けない
+        }
+
+        // ローリング開始判定: 地面にいて、キーが押された瞬間
         if (CheckRollInput() && IsGrounded)
         {
-            if (!IsRolling) // ★ここがポイント：開始した瞬間だけ通る
-            {
-                IsRolling = true;
-                col.height = rollHeight;
-                col.center = new Vector3(col.center.x, rollCenterY, col.center.z);
+            IsRolling = true;
+            rollTimer = rollDuration;
+            col.height = rollHeight;
+            col.center = new Vector3(col.center.x, rollCenterY, col.center.z);
 
-                StartCoroutine(RollSound(3.5f)); // ★ここなら1回だけ鳴ります
-            }
-        }
-        else
-        {
-            IsRolling = false;
-            col.height = defaultHeight;
-            col.center = new Vector3(col.center.x, defaultCenterY, col.center.z);
+            StartCoroutine(RollSound(rollDuration));
         }
     }
 
