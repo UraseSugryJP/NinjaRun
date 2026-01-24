@@ -176,16 +176,24 @@ public class PlayerMovement : MonoBehaviour
         return Mathf.Lerp(localPos.x, targetX, Time.deltaTime * laneChangeSpeed);
     }
 
-    private float GetGroundHeight()
+    // 修正箇所：GetGroundHeight メソッド
+private float GetGroundHeight()
+{
+    // ビームの発射位置
+    Vector3 rayOrigin = transform.position + (transform.up * 1.0f);
+    Ray ray = new Ray(rayOrigin, -transform.up);
+
+    // 最適化：GroundレイヤーとObstacleレイヤーの両方を判定対象にする
+    // 事前にインスペクターで Obstacle レイヤーを作成し、ここに追加してください
+    int layerMask = groundLayer | LayerMask.GetMask("Obstacle");
+
+    if (Physics.Raycast(ray, out RaycastHit hit, rayLength, layerMask))
     {
-        Vector3 rayOrigin = transform.position + (transform.up * 1.0f);
-        Ray ray = new Ray(rayOrigin, -transform.up);
-        if (Physics.Raycast(ray, out RaycastHit hit, rayLength, groundLayer))
-        {
-            return transform.parent.InverseTransformPoint(hit.point).y;
-        }
-        return -999f;
+        // 親（SplineCartなど）から見た相対的な高さを返す
+        return transform.parent.InverseTransformPoint(hit.point).y;
     }
+    return -999f;
+}
 
     private float HandleGravityAndJump(float groundHeight)
     {
