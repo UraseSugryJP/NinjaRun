@@ -1,18 +1,17 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.InputSystem; 
 
-// Rigidbodyがないとエラーになるように強制
 [RequireComponent(typeof(Rigidbody))]
 public class PlayerCollision : MonoBehaviour
 {
     [Header("参照（自動取得するので空欄でOK）")]
-    [SerializeField] private PlayerMovement movement; // 移動スクリプト
+    [SerializeField] private PlayerMovement movement; 
 
     [Header("自動リスタートの設定")]
-    [SerializeField] private float restartDelay = 1.0f; // 衝突後に何秒で最初からにするか
+    [SerializeField] private float restartDelay = 1.0f; 
 
-    // タグ定数（タグ名はUnityエディタと合わせる）
     private const string TAG_OBSTACLE = "Obstacle";
     private const string TAG_DEATHZONE = "DeathZone";
 
@@ -24,22 +23,24 @@ public class PlayerCollision : MonoBehaviour
         var rb = GetComponent<Rigidbody>();
         if (rb != null)
         {
-            rb.isKinematic = true;
+            rb.isKinematic = true; // 座標制御のため Kinematic
             rb.useGravity = false;
         }
 
-        if (movement == null)
-        {
-            movement = GetComponent<PlayerMovement>();
-        }
+        if (movement == null) movement = GetComponent<PlayerMovement>();
     }
 
     void Update()
     {
-        // GameOver 後に即時リトライを許可：Rキー / Space / タップ
+        // ゲームオーバー時の入力監視
         if (isDead && !restartTriggered)
         {
-            if (Input.GetKeyDown(KeyCode.R) || Input.GetKeyDown(KeyCode.Space) || Input.touchCount > 0)
+            bool shouldRestart = false;
+            if (Keyboard.current != null && (Keyboard.current.rKey.wasPressedThisFrame || Keyboard.current.spaceKey.wasPressedThisFrame)) shouldRestart = true;
+            if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame) shouldRestart = true;
+            if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) shouldRestart = true;
+
+            if (shouldRestart)
             {
                 restartTriggered = true;
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
@@ -47,71 +48,54 @@ public class PlayerCollision : MonoBehaviour
         }
     }
 
-    private void OnTriggerEnter(Collider other)
-    {
-        CheckCollision(other.gameObject);
-    }
-
-    private void OnCollisionEnter(Collision collision)
-    {
-        CheckCollision(collision.gameObject);
-    }
+    // すべての衝突をこのメソッドに集約
+    private void OnTriggerEnter(Collider other) => CheckCollision(other.gameObject);
+    private void OnCollisionEnter(Collision collision) => CheckCollision(collision.gameObject);
 
     private void CheckCollision(GameObject target)
-    {
-        if (isDead || target == null) return;
+{
+    if (isDead || target == null) return;
 
-        // ローリング中は RollableObstacle を無視
-        if (movement != null && movement.IsRolling)
+    bool isDeathZone = SafeCompareTag(target, TAG_DEATHZONE);
+    bool isObstacle = SafeCompareTag(target, TAG_OBSTACLE);
+
+    // 1. 【最優先】デスゾーンに触れたら即座に死亡
+    if (isDeathZone)
+    {
+        Debug.Log("DeathZoneに接触！");
+        HandleDeath(TAG_DEATHZONE);
+        return; // これ以降の判定（高さチェックなど）はしない
+    }
+
+    // 2. 障害物(Obstacle)の場合
+    if (isObstacle)
+    {
+        // ローリング中の特例判定
+        if (movement != null && movement.IsRolling && target.GetComponentInParent<RollableObstacle>() != null) return;
+
+        Collider targetCol = target.GetComponent<Collider>();
+        if (targetCol != null)
         {
-            var rollable = target.GetComponentInParent<RollableObstacle>();
-            if (rollable != null)
+            float obstacleTop = targetCol.bounds.max.y;
+            float playerBottom = transform.position.y;
+
+            // シビアな判定（高さの猶予を 0.02f に設定）
+            if (playerBottom > obstacleTop - 0.02f)
             {
-                return; // 衝突を無視
+                // 足元に障害物があるのでセーフ（乗っている状態）
+                return; 
             }
         }
 
-        Debug.Log($"[PlayerCollision] Collided with '{target.name}' tag='{SafeGetTag(target)}' pos={target.transform.position}");
-
-        bool isDeathZone = SafeCompareTag(target, TAG_DEATHZONE);
-        bool isObstacle = SafeCompareTag(target, TAG_OBSTACLE);
-
-        if (!isObstacle)
-        {
-            var ob = target.GetComponentInParent<ObstacleBehavior>();
-            if (ob != null) isObstacle = true;
-        }
-
-        if (isObstacle || isDeathZone)
-        {
-            HandleDeath(isObstacle ? TAG_OBSTACLE : TAG_DEATHZONE);
-        }
+        // 高さが足りなければ死亡
+        HandleDeath(TAG_OBSTACLE);
     }
+}
 
     private bool SafeCompareTag(GameObject go, string tag)
     {
         if (go == null) return false;
-        try
-        {
-            return go.CompareTag(tag);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private string SafeGetTag(GameObject go)
-    {
-        if (go == null) return "(null)";
-        try
-        {
-            return go.tag;
-        }
-        catch
-        {
-            return "(undefined)";
-        }
+        return go.CompareTag(tag);
     }
 
     private void HandleDeath(string tag)
@@ -120,21 +104,15 @@ public class PlayerCollision : MonoBehaviour
         isDead = true;
         Debug.Log("Game Over! 原因: " + tag);
 
-        if (movement != null)
-        {
-            movement.enabled = false;
-        }
-
+        if (movement != null) movement.enabled = false;
+        
+        // Splineの停止
         if (transform.parent != null)
         {
             var cart = transform.parent.GetComponent<UnityEngine.Splines.SplineAnimate>();
-            if (cart != null)
-            {
-                cart.Pause();
-            }
+            if (cart != null) cart.Pause();
         }
 
-        // 遅延リロード（ユーザーが即押しすれば Update 側で即リロードされる）
         StartCoroutine(RestartAfterDelay());
     }
 
