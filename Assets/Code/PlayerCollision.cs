@@ -52,22 +52,19 @@ public class PlayerCollision : MonoBehaviour
     private void OnTriggerEnter(Collider other) => CheckCollision(other.gameObject);
     private void OnCollisionEnter(Collision collision) => CheckCollision(collision.gameObject);
 
-    private void CheckCollision(GameObject target)
+  private void CheckCollision(GameObject target)
 {
     if (isDead || target == null) return;
 
     bool isDeathZone = SafeCompareTag(target, TAG_DEATHZONE);
     bool isObstacle = SafeCompareTag(target, TAG_OBSTACLE);
 
-    // 1. 【最優先】デスゾーンに触れたら即座に死亡
     if (isDeathZone)
     {
-        Debug.Log("DeathZoneに接触！");
         HandleDeath(TAG_DEATHZONE);
-        return; // これ以降の判定（高さチェックなど）はしない
+        return;
     }
 
-    // 2. 障害物(Obstacle)の場合
     if (isObstacle)
     {
         // ローリング中の特例判定
@@ -76,18 +73,27 @@ public class PlayerCollision : MonoBehaviour
         Collider targetCol = target.GetComponent<Collider>();
         if (targetCol != null)
         {
-            float obstacleTop = targetCol.bounds.max.y;
+            // --- 修正箇所：回転に対応した高さ判定 ---
+            
+            // 障害物の中心とワールドサイズを取得
+            Vector3 obsCenter = targetCol.bounds.center;
+            float obsHeight = targetCol.bounds.size.y;
+            float obstacleTop = obsCenter.y + (obsHeight * 0.5f);
+            
+            // プレイヤーの足元の位置
             float playerBottom = transform.position.y;
 
-            // シビアな判定（高さの猶予を 0.02f に設定）
-            if (playerBottom > obstacleTop - 0.02f)
+            // 判定の「遊び（許容範囲）」を少し広げる (0.02f -> 0.1f程度)
+            // 回転している場合、bounds.size.y が実際より大きくなることがあるため
+            float threshold = 0.1f; 
+
+            if (playerBottom > obstacleTop - threshold)
             {
-                // 足元に障害物があるのでセーフ（乗っている状態）
+                // 足元が障害物の天面付近、あるいはそれより上なら「乗った」とみなす
                 return; 
             }
         }
 
-        // 高さが足りなければ死亡
         HandleDeath(TAG_OBSTACLE);
     }
 }
