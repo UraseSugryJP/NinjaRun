@@ -1,71 +1,59 @@
 using UnityEngine;
+using UnityEngine.Splines;
+using System.Collections.Generic;
 
 public class ItemSpawner : MonoBehaviour
 {
-    // ¶¬‚·‚éƒAƒCƒeƒ€‚ÌƒvƒŒƒnƒu
-    public GameObject itemPrefab;
+    [Header("å‚ç…§")]
+    [SerializeField] private SplineContainer splineContainer;
+    [SerializeField] private GameObject itemPrefab;
 
-    // Šî€‚Æ‚È‚é°‚ÌƒIƒuƒWƒFƒNƒgiInspector‚Åİ’èj
-    public GameObject ground;
+    [Header("å‹•ç·šè¨­å®š")]
+    [SerializeField] private int itemsPerSegment = 3; 
+    [SerializeField] private float itemYOffset = 0.5f;
+    [SerializeField] private float laneWidth = 1.0f; 
 
-    // ƒR[ƒX‚Ìİ’è
-    private float centerOffsetX = -20.0f;
-    private float laneWidth = 3.0f;
+    private int lastSafeLane = 1; 
 
-    [Header("¶¬‚Ìİ’è")]
-    public int spawnCount = 10;
-    public float startOffset = 5.0f;
-    public float zInterval = 3.0f;
-
-    private float groundStartZ;
-
-    void Start()
+    public void SpawnPathmakingItems(int[,] pattern, int currentRow, float currentDist, float nextDist, float splineLength)
     {
-        // °ƒIƒuƒWƒFƒNƒg‚ªİ’è‚³‚ê‚Ä‚¢‚é‚©Šm”F
-        if (ground != null)
+        if (splineContainer == null || itemPrefab == null) return;
+
+        List<int> safeLanes = new List<int>();
+        for (int l = 0; l < 3; l++)
         {
-            Renderer groundRenderer = ground.GetComponent<Renderer>();
-
-            // °‚ÌŠJn’n“_iZÀ•W‚ÌÅ¬’lj‚ğæ“¾
-            groundStartZ = groundRenderer.bounds.min.z;
-
-            // °‚Ì’·‚³iZ•ûŒü‚ÌƒTƒCƒYj‚ğæ“¾
-            float groundLength = groundRenderer.bounds.size.z;
-
-            // İ’è‚³‚ê‚½ŠÔŠuizIntervalj‚ÉŠî‚Ã‚¢‚ÄA”z’u‰Â”\‚ÈŒÂ”‚ğ©“®ŒvZ
-            if (zInterval > 0)
-            {
-                float availableLength = groundLength - startOffset;
-                // °‚Ì’·‚³‚Éû‚Ü‚éÅ‘åŒÂ”‚ğŒvZiƒ}ƒCƒiƒX‚É‚È‚ç‚È‚¢‚æ‚¤§Œäj
-                spawnCount = Mathf.Max(0, Mathf.FloorToInt(availableLength / zInterval));
-            }
-
-            // ƒfƒoƒbƒO—pƒƒOFŒvZŒ‹‰Ê‚ÌŠm”F
-            Debug.Log($"g—p‚·‚é°: {ground.name}, ’·‚³: {groundLength}, ¶¬”: {spawnCount}");
-        }
-        else
-        {
-            Debug.LogError("ƒGƒ‰[: ItemSpawner‚ÌuGroundv‚É°‚ÌƒIƒuƒWƒFƒNƒg‚ªİ’è‚³‚ê‚Ä‚¢‚Ü‚¹‚ñB");
-            return;
+            if (pattern[currentRow, l] == 0) safeLanes.Add(l);
         }
 
-        // ŒvZ‚³‚ê‚½ŒÂ”•ª‚¾‚¯ƒAƒCƒeƒ€‚ğ¶¬
-        for (int i = 0; i < spawnCount; i++)
+        int targetLane = safeLanes.Count > 0 ? safeLanes[UnityEngine.Random.Range(0, safeLanes.Count)] : 1;
+
+        for (int i = 0; i < itemsPerSegment; i++)
         {
-            // ƒŒ[ƒ“‚ğƒ‰ƒ“ƒ_ƒ€‚ÉŒˆ’èi-1:¶, 0:’†‰›, 1:‰Ej
-            int laneIndex = Random.Range(-1, 2);
-            SpawnOneItem(i, laneIndex);
+            float t_lerp = (float)i / itemsPerSegment;
+            float lerpedDist = Mathf.Lerp(currentDist, nextDist, t_lerp);
+            float lerpedLane = Mathf.Lerp(lastSafeLane, targetLane, t_lerp);
+            
+            PlaceItemAt(lerpedDist, lerpedLane, splineLength);
         }
+
+        lastSafeLane = targetLane;
     }
 
-    // w’è‚³‚ê‚½ƒCƒ“ƒfƒbƒNƒX‚ÆƒŒ[ƒ“‚ÉƒAƒCƒeƒ€‚ğ1‚Â¶¬‚·‚é
-    void SpawnOneItem(int index, int lane)
+    private void PlaceItemAt(float distance, float laneValue, float splineLength)
     {
-        float x = (lane * laneWidth) + centerOffsetX;
-        float z = groundStartZ + startOffset + (index * zInterval);
-        float y = -0.5f;
+        float t = Mathf.Clamp01(distance / splineLength);
+        Vector3 basePos = (Vector3)splineContainer.EvaluatePosition(t);
+        Vector3 tangent = Vector3.Normalize((Vector3)splineContainer.EvaluateTangent(t));
+        Vector3 right = Vector3.Cross(tangent, Vector3.up).normalized;
 
-        Vector3 spawnPos = new Vector3(x, y, z);
-        Instantiate(itemPrefab, spawnPos, Quaternion.identity);
+        float laneOffset = laneValue - 1f; 
+        Vector3 spawnPos = basePos + (right * (laneOffset * laneWidth));
+
+        if (Physics.Raycast(spawnPos + Vector3.up * 5f, Vector3.down, out RaycastHit hit, 10f))
+        {
+            spawnPos.y = hit.point.y + itemYOffset;
+        }
+
+        Instantiate(itemPrefab, spawnPos, Quaternion.LookRotation(tangent));
     }
 }
