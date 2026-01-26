@@ -1,13 +1,13 @@
 using System.Collections;
-using System.Collections.Generic; // ƒXƒ‰ƒbƒVƒ…‚ğƒhƒbƒg‚ÉC³
+using System.Collections.Generic; // ï¿½Xï¿½ï¿½ï¿½bï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½hï¿½bï¿½gï¿½ÉCï¿½ï¿½
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-// ƒNƒ‰ƒX–¼‚ÌŒã‚ë‚Éu: MonoBehaviourv‚ğ’Ç‰Á
+// ï¿½Nï¿½ï¿½ï¿½Xï¿½ï¿½ï¿½ÌŒï¿½ï¿½Éu: MonoBehaviourï¿½vï¿½ï¿½Ç‰ï¿½
 public class TitleManager : MonoBehaviour
 {
     public void OnStartButton()
     {
-        SceneManager.LoadScene("RunStage1");
+        SceneManager.LoadScene("RunSceneA");
     }
 }

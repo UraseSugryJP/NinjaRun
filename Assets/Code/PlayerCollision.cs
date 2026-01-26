@@ -11,7 +11,8 @@ public class PlayerCollision : MonoBehaviour
 
     [Header("自動リスタートの設定")]
     [SerializeField] private float restartDelay = 1.0f; 
-
+    [SerializeField] private DeathUIController deathUI;
+    
     private const string TAG_OBSTACLE = "Obstacle";
     private const string TAG_DEATHZONE = "DeathZone";
 
@@ -104,23 +105,32 @@ public class PlayerCollision : MonoBehaviour
         return go.CompareTag(tag);
     }
 
+    
     private void HandleDeath(string tag)
+{
+    if (isDead) return;
+    isDead = true;
+
+    // 1. スプライン移動を即座に破棄（これで無限走行が止まる）
+    var animator = GetComponent<UnityEngine.Splines.SplineAnimate>();
+    if (animator != null) Destroy(animator); 
+
+    // 2. 物理挙動を爆発させる
+    Rigidbody rb = GetComponent<Rigidbody>();
+    if (rb != null)
     {
-        if (isDead) return;
-        isDead = true;
-        Debug.Log("Game Over! 原因: " + tag);
-
-        if (movement != null) movement.enabled = false;
-        
-        // Splineの停止
-        if (transform.parent != null)
-        {
-            var cart = transform.parent.GetComponent<UnityEngine.Splines.SplineAnimate>();
-            if (cart != null) cart.Pause();
-        }
-
-        StartCoroutine(RestartAfterDelay());
+        rb.isKinematic = false; // 物理を有効化
+        rb.useGravity = true;
+        // 少し後ろに弾き飛ばされる衝撃を加える
+        rb.AddForce(-transform.forward * 5f + Vector3.up * 3f, ForceMode.Impulse);
     }
+
+    // 3. デス演出呼び出し
+    if (deathUI != null) deathUI.ShowDeathEffect();
+    
+    // タイムスケールを少し遅くして「何が起きたか」見せる
+    Time.timeScale = 0.5f; 
+}
 
     private IEnumerator RestartAfterDelay()
     {
