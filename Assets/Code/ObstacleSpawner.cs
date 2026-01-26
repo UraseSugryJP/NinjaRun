@@ -1,226 +1,152 @@
 using UnityEngine;
 using UnityEngine.Splines;
-using UnityEngine.InputSystem;
 using System.Collections.Generic;
-using Unity.Mathematics;
 
 public class ObstacleSpawner : MonoBehaviour
 {
     [System.Serializable]
-    public struct ObstacleCategory
-    {
-        public string name;
-        public int id;           // pattern配列で使用するID
-        public List<GameObject> prefabs; // このIDで出現しうるプレハブのリスト
-        public bool isRollable;  
+    public struct ObstacleCategory {
+        public string name; public int id; public List<GameObject> prefabs; public bool isRollable;
     }
 
-    [Header("障害物カタログ")]
+    [Header("Settings")]
     [SerializeField] private List<ObstacleCategory> obstacleCatalog = new List<ObstacleCategory>();
+    [SerializeField] private float laneWidth = 1.0f;
+    [SerializeField] private float minSpacing = 4.0f;
+    [SerializeField] private float maxSpacing = 8.0f;
+    [SerializeField] private float spawnAheadRange = 50.0f;
 
-    [Header("参照")]
+    [Header("References")]
     [SerializeField] private Transform playerTransform;
     [SerializeField] private SplineContainer splineContainer;
     [SerializeField] private ItemSpawner itemSpawner;
+    [SerializeField] private LayerMask groundLayer = ~0;
 
-    [Header("動的間隔設定")]
-    [SerializeField] private float minSpawnSpacing = 2.0f; 
-    [SerializeField] private float maxSpawnSpacing = 5.0f; 
-    [SerializeField] private float patternGap = 4.0f;      
-    [SerializeField] private float initialSpawnOffset = 10.0f;
-    [SerializeField] private float spawnAheadRange = 50.0f;
+    private List<GameObject> activeObstacles = new List<GameObject>();
+    private float nextSpawnDist = 5f; // 0から開始して即座に湧かせる
+    private float totalLen = 0f;
+    private int curPattern = 0;
+    private int curRow = 0;
 
-    [Header("コース設定")]
-    [SerializeField] private float laneWidth = 1.0f;
-
-    private LayerMask groundLayer = ~0;
-    private float groundRayHeight = 10f;
-    private float groundRayMaxDistance = 30f;
-    private int maxTotalObstacles = 300;
-
-    private static readonly int[][,] patterns = new int[][,]
-    {
-        new int[,] { { 0, 1, 1 }, { 1, 1, 0 }, { 1, 0, 1 }, { 0, 1, 1 }, { 1, 1, 0 }, { 1, 0, 1 } },
-        new int[,] { { 2, 1, 1 }, { 1, 2, 1 }, { 1, 1, 2 }, { 1, 2, 1 }, { 2, 1, 1 }, { 1, 1, 0 } },
-        new int[,] { { 3, 3, 3 }, { 2, 2, 2 }, { 0, 1, 1 }, { 3, 3, 3 }, { 1, 1, 0 }, { 2, 2, 2 } },
-        new int[,] { { 0, 1, 1 }, { 2, 0, 1 }, { 1, 3, 0 }, { 1, 0, 2 }, { 1, 1, 0 }, { 0, 1, 1 } },
-        new int[,] { { 0, 1, 0 }, { 2, 1, 2 }, { 1, 0, 1 }, { 3, 0, 3 }, { 1, 0, 1 }, { 0, 1, 0 }, { 2, 1, 2 } },
-        new int[,] { { 1, 1, 0 }, { 1, 0, 2 }, { 0, 1, 1 }, { 3, 1, 1 }, { 1, 0, 1 }, { 1, 1, 0 }, { 0, 2, 1 } },
-        new int[,] { { 2, 1, 3 }, { 1, 0, 1 }, { 3, 1, 2 }, { 1, 0, 1 }, { 2, 1, 3 }, { 0, 2, 0 } },
-        new int[,] { { 0, 1, 1 }, { 1, 0, 1 }, { 1, 1, 0 }, { 0, 1, 1 }, { 1, 0, 1 }, { 1, 1, 0 } },
-        new int[,] { { 1, 0, 1 }, { 0, 2, 0 }, { 1, 0, 1 }, { 0, 3, 0 }, { 1, 0, 1 }, { 0, 1, 0 }, { 1, 0, 1 } },
-        new int[,] { { 2, 1, 0 }, { 1, 3, 1 }, { 0, 1, 2 }, { 1, 2, 1 }, { 3, 1, 0 }, { 1, 0, 1 }, { 0, 1, 3 } },
-        new int[,] { { 2, 2, 2 }, { 1, 0, 1 }, { 3, 3, 3 }, { 0, 1, 1 }, { 2, 2, 2 }, { 1, 1, 0 }, { 3, 3, 3 } },
-        new int[,] { { 1, 2, 1 }, { 0, 1, 1 }, { 1, 3, 1 }, { 1, 1, 0 }, { 1, 2, 1 }, { 1, 0, 1 } },
+    // 中難易度パターン
+    private static readonly int[][,] patterns = new int[][,] {
+        new int[,] { {0,1,0}, {1,0,1}, {0,1,0} },
+        new int[,] { {2,2,2}, {0,0,0}, {3,0,3} }, // ID 3 は端のみ
+        new int[,] { {4,0,0}, {0,0,4}, {2,2,2} }, // ID 4 巨大壁
+        new int[,] { {1,2,1}, {3,0,3}, {1,0,1} },
+        new int[,] { {0,1,1}, {1,1,0}, {0,1,1} },
+        new int[,] { {3,1,3}, {2,0,2}, {3,1,3} },
+        new int[,] { {4,0,0}, {0,0,0}, {0,0,4} } 
     };
 
-    private readonly List<GameObject> activeObstacles = new List<GameObject>();
-    private float splineLengthApprox = 1f;
-    private float nextSpawnDistance = 0f;
-    private SplineAnimate playerSplineAnimate;
-    private int currentPatternIndex = -1;
-    private int currentRowIndex = 0;
-
-    void Start()
-    {
-        if (playerTransform == null) playerTransform = GameObject.FindWithTag("Player")?.transform;
-        if (playerTransform != null) playerSplineAnimate = playerTransform.GetComponentInParent<SplineAnimate>();
+    void Start() {
         if (splineContainer == null) splineContainer = FindObjectOfType<SplineContainer>();
-        if (itemSpawner == null) itemSpawner = GetComponent<ItemSpawner>();
-
-        if (splineContainer != null)
-        {
-            splineLengthApprox = ApproximateSplineLength();
-            float playerT = FindClosestTOnSpline(playerTransform.position);
-            nextSpawnDistance = (playerT * splineLengthApprox) + initialSpawnOffset;
-            SelectNextPattern();
-        }
+        if (playerTransform == null) playerTransform = GameObject.FindWithTag("Player")?.transform;
+        
+        totalLen = CalculateSplineLength();
+        curPattern = UnityEngine.Random.Range(0, patterns.Length);
+        
+        Debug.Log($"Spawner Started. Length: {totalLen}");
     }
 
-    void Update()
-    {
+    void Update() {
         if (playerTransform == null || splineContainer == null) return;
-        activeObstacles.RemoveAll(obj => obj == null);
+        
+        activeObstacles.RemoveAll(o => o == null);
 
-        float playerT = (playerSplineAnimate != null) ? playerSplineAnimate.NormalizedTime : FindClosestTOnSpline(playerTransform.position);
-        float playerDist = playerT * splineLengthApprox;
+        // プレイヤーの現在位置（T値）を取得して距離に換算
+        float playerT = GetClosestT(playerTransform.position);
+        float playerDist = playerT * totalLen;
 
-        float targetAhead = playerDist + spawnAheadRange;
-        int safety = 0;
-        while (nextSpawnDistance < targetAhead && activeObstacles.Count < maxTotalObstacles && safety++ < 100)
-        {
-            SpawnNextRow();
+        // プレイヤーの先50mまで生成し続ける
+        while (nextSpawnDist < playerDist + spawnAheadRange && activeObstacles.Count < 50) {
+            SpawnNext();
         }
-        if (Keyboard.current != null && Keyboard.current.pKey.wasPressedThisFrame) SpawnAllPatternsForDebug();
     }
 
-    private void SelectNextPattern()
-    {
-        currentPatternIndex = UnityEngine.Random.Range(0, patterns.Length);
-        currentRowIndex = 0;
-    }
-
-    private void SpawnNextRow()
-    {
-        if (currentPatternIndex < 0) SelectNextPattern();
-        int[,] pattern = patterns[currentPatternIndex];
-        int rowCount = pattern.GetLength(0);
-
-        float currentGap = UnityEngine.Random.Range(minSpawnSpacing, maxSpawnSpacing);
-
-        if (currentRowIndex >= rowCount)
-        {
-            float totalGap = currentGap + patternGap;
-            if (itemSpawner != null) itemSpawner.SpawnPathmakingItems(pattern, rowCount - 1, nextSpawnDistance, nextSpawnDistance + totalGap, splineLengthApprox);
-            nextSpawnDistance += totalGap;
-            SelectNextPattern();
+    void SpawnNext() {
+        int[,] p = patterns[curPattern];
+        
+        if (curRow >= p.GetLength(0)) {
+            curRow = 0;
+            curPattern = UnityEngine.Random.Range(0, patterns.Length);
+            nextSpawnDist += 5f; 
             return;
         }
 
-        if (itemSpawner != null) itemSpawner.SpawnPathmakingItems(pattern, currentRowIndex, nextSpawnDistance, nextSpawnDistance + currentGap, splineLengthApprox);
-        SpawnRow(pattern, currentRowIndex, nextSpawnDistance);
-        currentRowIndex++;
-        nextSpawnDistance += currentGap;
+        float gap = UnityEngine.Random.Range(minSpacing, maxSpacing);
+        if (itemSpawner) itemSpawner.SpawnPathmakingItems(p, curRow, nextSpawnDist, nextSpawnDist + gap, totalLen);
+        
+        SpawnRow(p, curRow, nextSpawnDist);
+
+        nextSpawnDist += gap;
+        curRow++;
     }
 
-    private void SpawnRow(int[,] pattern, int row, float distance)
-    {
-        float t = Mathf.Clamp01(distance / splineLengthApprox);
-        Vector3 basePos = (Vector3)splineContainer.EvaluatePosition(t); 
-        Vector3 tangent = Vector3.Normalize((Vector3)splineContainer.EvaluateTangent(t)); 
-        Vector3 right = Vector3.Cross(tangent, Vector3.up).normalized;
-        Quaternion rot = Quaternion.LookRotation(tangent, Vector3.up);
+    void SpawnRow(int[,] pattern, int row, float dist) {
+        float t = Mathf.Clamp01(dist / totalLen);
+        Vector3 pos = (Vector3)splineContainer.EvaluatePosition(t);
+        Vector3 tan = Vector3.Normalize((Vector3)splineContainer.EvaluateTangent(t));
+        Vector3 right = Vector3.Cross(tan, Vector3.up).normalized;
+        Quaternion splineRot = Quaternion.LookRotation(tan, Vector3.up);
 
-        for (int lane = 0; lane < 3; lane++)
-        {
-            int typeID = pattern[row, lane];
-            if (typeID == 0) continue;
+        for (int i = 0; i < 3; i++) {
+            int id = pattern[row, i];
+            if (id == 0) continue;
+            if (id == 3 && i == 1) continue; // ID 3 は中央スキップ
 
-            ObstacleCategory cat = GetCategoryByID(typeID);
+            var cat = obstacleCatalog.Find(c => c.id == id);
+            if (cat.prefabs == null || cat.prefabs.Count == 0) continue;
+
+            GameObject prefab = cat.prefabs[UnityEngine.Random.Range(0, cat.prefabs.Count)];
             
-            // プレハブリストが空でないか確認し、ランダムに1つ選択
-            if (cat.prefabs != null && cat.prefabs.Count > 0)
-            {
-                GameObject selectedPrefab = cat.prefabs[UnityEngine.Random.Range(0, cat.prefabs.Count)];
-                
-                Vector3 spawnPos = basePos + right * ((lane - 1) * laneWidth);
-                if (Physics.Raycast(spawnPos + Vector3.up * groundRayHeight, Vector3.down, out RaycastHit hit, groundRayMaxDistance + groundRayHeight, groundLayer))
-                {
-                    spawnPos.y = hit.point.y;
-                }
-                SpawnObstacle(cat, selectedPrefab, spawnPos, rot);
-            }
-        }
-    }
+            // プレハブ自体の回転をベースにする
+            Quaternion sRot = splineRot * prefab.transform.rotation;
 
-    private ObstacleCategory GetCategoryByID(int id)
-    {
-        foreach (var cat in obstacleCatalog)
-        {
-            if (cat.id == id) return cat;
-        }
-        return default;
-    }
-
-    private void SpawnObstacle(ObstacleCategory cat, GameObject prefab, Vector3 pos, Quaternion rot)
-    {
-        GameObject obj = Instantiate(prefab, pos, rot);
-        if (cat.isRollable && obj.GetComponent<RollableObstacle>() == null) obj.AddComponent<RollableObstacle>();
-        var behavior = obj.AddComponent<ObstacleBehavior>();
-        behavior.Initialize(playerTransform, this, 0.85f, 5f, groundLayer);
-        activeObstacles.Add(obj);
-    }
-
-    // (ユーティリティメソッド群：FindClosestTOnSplineなどは不変)
-    private float FindClosestTOnSpline(Vector3 worldPos)
-    {
-        float bestT = 0f; float bestDistSqr = float.MaxValue;
-        for (int i = 0; i <= 100; i++)
-        {
-            float t = i / 100f;
-            Vector3 p = (Vector3)splineContainer.EvaluatePosition(t);
-            float d = (p - worldPos).sqrMagnitude;
-            if (d < bestDistSqr) { bestDistSqr = d; bestT = t; }
-        }
-        return bestT;
-    }
-
-    private float ApproximateSplineLength()
-    {
-        float len = 0f; 
-        Vector3 prev = (Vector3)splineContainer.EvaluatePosition(0f);
-        for (int i = 1; i <= 100; i++)
-        {
-            Vector3 p = (Vector3)splineContainer.EvaluatePosition(i / 100f);
-            len += Vector3.Distance(prev, p); prev = p;
-        }
-        return len > 0 ? len : 1f;
-    }
-
-    public void NotifyObstacleDestroyed(GameObject obj) { activeObstacles.Remove(obj); }
-
-    private void SpawnAllPatternsForDebug()
-    {
-        float zOffset = 0f; float debugSpacing = minSpawnSpacing;
-        Vector3 basePos = (playerTransform != null) ? playerTransform.position + Vector3.right * 30f : Vector3.right * 30f;
-        for (int pIdx = 0; pIdx < patterns.Length; pIdx++)
-        {
-            int[,] p = patterns[pIdx];
-            for (int r = 0; r < p.GetLength(0); r++)
-            {
-                for (int l = 0; l < 3; l++)
-                {
-                    int typeID = p[r, l];
-                    if (typeID == 0) continue;
-                    ObstacleCategory cat = GetCategoryByID(typeID);
-                    if (cat.prefabs != null && cat.prefabs.Count > 0)
-                    {
-                        Vector3 pos = basePos + new Vector3(pIdx * 15f, 0, zOffset + r * debugSpacing);
-                        Instantiate(cat.prefabs[0], pos, Quaternion.identity); // デバッグ時は最初の1つ
-                    }
+            Vector3 sPos;
+            if (id == 4) { // 巨大壁
+                float offset = (i == 2) ? 0.5f * laneWidth : -0.5f * laneWidth;
+                sPos = pos + right * offset;
+            } else {
+                sPos = pos + right * ((i - 1) * laneWidth);
+                // --- ID:3 回転修正：右端 (lane 2) の場合に Y軸180度回転 ---
+                if (id == 3 && i == 2) {
+                    sRot = sRot * Quaternion.Euler(0, 180f, 0);
                 }
             }
-            zOffset += (p.GetLength(0) + 1) * debugSpacing + 20f;
+
+            // 地面判定。ここでの補正値は0。
+            if (Physics.Raycast(sPos + Vector3.up * 10f, Vector3.down, out RaycastHit hit, 20f, groundLayer)) {
+                sPos.y = hit.point.y;
+            }
+
+            GameObject obj = Instantiate(prefab, sPos, sRot);
+            if (cat.isRollable) obj.AddComponent<RollableObstacle>();
+            obj.AddComponent<ObstacleBehavior>().Initialize(playerTransform, this, 0.85f, 5f, groundLayer);
+            activeObstacles.Add(obj);
         }
+    }
+
+    float CalculateSplineLength() {
+        float l = 0; Vector3 p = (Vector3)splineContainer.EvaluatePosition(0);
+        for(int i=1; i<=100; i++) {
+            Vector3 n = (Vector3)splineContainer.EvaluatePosition(i/100f);
+            l += Vector3.Distance(p, n); p = n;
+        }
+        return l > 0 ? l : 1000f;
+    }
+
+    float GetClosestT(Vector3 wp) {
+        float bt = 0; float bd = float.MaxValue;
+        for(int i=0; i<=50; i++) {
+            float t = i/50f;
+            float d = Vector3.SqrMagnitude((Vector3)splineContainer.EvaluatePosition(t) - wp);
+            if (d < bd) { bd = d; bt = t; }
+        }
+        return bt;
+    }
+
+    public void NotifyObstacleDestroyed(GameObject obj) {
+        if (activeObstacles.Contains(obj)) activeObstacles.Remove(obj);
     }
 }

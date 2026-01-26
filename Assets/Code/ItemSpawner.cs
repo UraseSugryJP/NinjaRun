@@ -4,72 +4,33 @@ using System.Collections.Generic;
 
 public class ItemSpawner : MonoBehaviour
 {
-    [Header("参照")]
     [SerializeField] private SplineContainer splineContainer;
     [SerializeField] private GameObject itemPrefab;
+    [SerializeField] private float laneWidth = 1.0f;
+    private int lastLane = 1;
 
-    [Header("動線設定")]
-    [SerializeField] private int itemsPerSegment = 3; 
-    [SerializeField] private float itemYOffset = 0.5f;
-    [SerializeField] private float laneWidth = 1.0f; // ObstacleSpawnerと一致させる
-
-    private int lastSafeLane = 1; // 0:左, 1:中, 2:右
-
-    public void SpawnPathmakingItems(int[,] pattern, int currentRow, float currentDist, float nextDist, float splineLength)
-    {
+    public void SpawnPathmakingItems(int[,] p, int row, float curD, float nxtD, float totalLen) {
         if (splineContainer == null || itemPrefab == null) return;
 
-        // 1. 安全なレーン（0, 1, 2）を特定
-        List<int> safeLanes = new List<int>();
-        for (int l = 0; l < 3; l++)
-        {
-            if (pattern[currentRow, l] == 0) safeLanes.Add(l);
-        }
+        List<int> safe = new List<int>();
+        for (int i = 0; i < 3; i++) if (p[row, i] == 0) safe.Add(i);
+        int target = safe.Count > 0 ? safe[Random.Range(0, safe.Count)] : 1;
 
-        // 2. 次のターゲットレーンを決定
-        int targetLane = safeLanes.Count > 0 ? safeLanes[Random.Range(0, safeLanes.Count)] : 1;
-
-        // 3. アイテムを「行の間」に配置
-        // i = 1 から始めることで、障害物の真上にアイテムが重なるのを防ぐ
-        for (int i = 1; i <= itemsPerSegment; i++)
-        {
-            // 0.0〜1.0 の割合を計算
-            float t_lerp = (float)i / (float)(itemsPerSegment + 1);
+        for (int j = 1; j <= 3; j++) {
+            float t_l = j / 4f; // 障害物と重ならないように調整
+            float d = Mathf.Lerp(curD, nxtD, t_l);
+            float laneValue = Mathf.Clamp(Mathf.Lerp((float)lastLane, (float)target, t_l), 0f, 2f);
             
-            float lerpedDist = Mathf.Lerp(currentDist, nextDist, t_lerp);
-            
-            // --- ここがロジックの肝 ---
-            // レーン番号を 0.0(左) 〜 2.0(右) の間で補間し、絶対に 0〜2 の間に収める
-            float lerpedLaneValue = Mathf.Lerp((float)lastSafeLane, (float)targetLane, t_lerp);
-            lerpedLaneValue = Mathf.Clamp(lerpedLaneValue, 0f, 2f); 
-            
-            PlaceItemAt(lerpedDist, lerpedLaneValue, splineLength);
+            float t = Mathf.Clamp01(d / totalLen);
+            Vector3 pos = (Vector3)splineContainer.EvaluatePosition(t);
+            Vector3 tan = Vector3.Normalize((Vector3)splineContainer.EvaluateTangent(t));
+            Vector3 right = Vector3.Cross(tan, Vector3.up).normalized;
+
+            Vector3 sPos = pos + right * ((laneValue - 1.0f) * laneWidth);
+            if (Physics.Raycast(sPos + Vector3.up * 10f, Vector3.down, out RaycastHit hit, 20f)) sPos.y = hit.point.y + 0.5f;
+
+            Instantiate(itemPrefab, sPos, Quaternion.LookRotation(tan, Vector3.up));
         }
-
-        lastSafeLane = targetLane;
-    }
-
-    private void PlaceItemAt(float distance, float laneValue, float splineLength)
-    {
-        float t = Mathf.Clamp01(distance / splineLength);
-        
-        // ObstacleSpawner.cs と同一の座標計算
-        Vector3 basePos = (Vector3)splineContainer.EvaluatePosition(t); 
-        Vector3 tangent = Vector3.Normalize((Vector3)splineContainer.EvaluateTangent(t)); 
-        Vector3 right = Vector3.Cross(tangent, Vector3.up).normalized;
-
-        // laneValue 1.0(中央) の時に、(1.0 - 1.0) * laneWidth = 0 となりスプライン直下になる
-        // laneValue 0.0(左端) -> -1.0 * laneWidth
-        // laneValue 2.0(右端) ->  1.0 * laneWidth
-        float laneOffset = laneValue - 1.0f; 
-        Vector3 spawnPos = basePos + (right * (laneOffset * laneWidth));
-
-        // 接地判定
-        if (Physics.Raycast(spawnPos + Vector3.up * 10f, Vector3.down, out RaycastHit hit, 20f))
-        {
-            spawnPos.y = hit.point.y + itemYOffset;
-        }
-
-        Instantiate(itemPrefab, spawnPos, Quaternion.LookRotation(tangent, Vector3.up));
+        lastLane = target;
     }
 }

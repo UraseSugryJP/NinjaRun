@@ -1,5 +1,5 @@
 using System.Collections;
-using System.Collections.Generic; // ƒXƒ‰ƒbƒVƒ…‚ğƒhƒbƒg‚ÉC³
+using System.Collections.Generic; // ï¿½Xï¿½ï¿½ï¿½bï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½hï¿½bï¿½gï¿½ÉCï¿½ï¿½
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
