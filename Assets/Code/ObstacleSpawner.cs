@@ -84,48 +84,50 @@ public class ObstacleSpawner : MonoBehaviour
     }
 
     void SpawnRow(int[,] pattern, int row, float dist) {
-        float t = Mathf.Clamp01(dist / totalLen);
-        Vector3 pos = (Vector3)splineContainer.EvaluatePosition(t);
-        Vector3 tan = Vector3.Normalize((Vector3)splineContainer.EvaluateTangent(t));
-        Vector3 right = Vector3.Cross(tan, Vector3.up).normalized;
-        Quaternion splineRot = Quaternion.LookRotation(tan, Vector3.up);
+    // 【修正】走行距離をスプラインの全長で割り、0.0～1.0の範囲でループさせる
+    float loopDist = dist % totalLen;
+    float t = loopDist / totalLen;
 
-        for (int i = 0; i < 3; i++) {
-            int id = pattern[row, i];
-            if (id == 0) continue;
-            if (id == 3 && i == 1) continue; // ID 3 は中央スキップ
+    Vector3 pos = (Vector3)splineContainer.EvaluatePosition(t);
+    Vector3 tan = Vector3.Normalize((Vector3)splineContainer.EvaluateTangent(t));
+    Vector3 right = Vector3.Cross(tan, Vector3.up).normalized;
+    Quaternion splineRot = Quaternion.LookRotation(tan, Vector3.up);
 
-            var cat = obstacleCatalog.Find(c => c.id == id);
-            if (cat.prefabs == null || cat.prefabs.Count == 0) continue;
+    for (int i = 0; i < 3; i++) {
+        int id = pattern[row, i];
+        if (id == 0) continue;
+        if (id == 3 && i == 1) continue; 
 
-            GameObject prefab = cat.prefabs[UnityEngine.Random.Range(0, cat.prefabs.Count)];
-            
-            // プレハブ自体の回転をベースにする
-            Quaternion sRot = splineRot * prefab.transform.rotation;
+        var cat = obstacleCatalog.Find(c => c.id == id);
+        if (cat.prefabs == null || cat.prefabs.Count == 0) continue;
 
-            Vector3 sPos;
-            if (id == 4) { // 巨大壁
-                float offset = (i == 2) ? 0.5f * laneWidth : -0.5f * laneWidth;
-                sPos = pos + right * offset;
-            } else {
-                sPos = pos + right * ((i - 1) * laneWidth);
-                // --- ID:3 回転修正：右端 (lane 2) の場合に Y軸180度回転 ---
-                if (id == 3 && i == 2) {
-                    sRot = sRot * Quaternion.Euler(0, 180f, 0);
-                }
+        GameObject prefab = cat.prefabs[UnityEngine.Random.Range(0, cat.prefabs.Count)];
+        Quaternion sRot = splineRot * prefab.transform.rotation;
+
+        Vector3 sPos;
+        if (id == 4) { 
+            float offset = (i == 2) ? 0.5f * laneWidth : -0.5f * laneWidth;
+            sPos = pos + right * offset;
+        } else {
+            sPos = pos + right * ((i - 1) * laneWidth);
+            if (id == 3 && i == 2) {
+                sRot = sRot * Quaternion.Euler(0, 180f, 0);
             }
-
-            // 地面判定。ここでの補正値は0。
-            if (Physics.Raycast(sPos + Vector3.up * 10f, Vector3.down, out RaycastHit hit, 20f, groundLayer)) {
-                sPos.y = hit.point.y;
-            }
-
-            GameObject obj = Instantiate(prefab, sPos, sRot);
-            if (cat.isRollable) obj.AddComponent<RollableObstacle>();
-            obj.AddComponent<ObstacleBehavior>().Initialize(playerTransform, this, 0.85f, 5f, groundLayer);
-            activeObstacles.Add(obj);
         }
+
+        if (Physics.Raycast(sPos + Vector3.up * 10f, Vector3.down, out RaycastHit hit, 20f, groundLayer)) {
+            sPos.y = hit.point.y;
+        }
+
+        GameObject obj = Instantiate(prefab, sPos, sRot);
+        if (cat.isRollable) obj.AddComponent<RollableObstacle>();
+        
+        // 【重要】ObstacleBehavior が「プレイヤーの後ろに回ったら自動で消える」機能を持っていれば
+        // activeObstacles.RemoveAll(o => o == null) と相まって、リストも肥大化せずループできます
+        obj.AddComponent<ObstacleBehavior>().Initialize(playerTransform, this, 0.85f, 5f, groundLayer);
+        activeObstacles.Add(obj);
     }
+}
 
     float CalculateSplineLength() {
         float l = 0; Vector3 p = (Vector3)splineContainer.EvaluatePosition(0);
